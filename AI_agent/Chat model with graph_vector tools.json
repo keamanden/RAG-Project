@@ -1,0 +1,148 @@
+{
+  "name": "Chat model with graph/vector tools",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c27ae3fb-410b-4d8c-a1c5-17cecfdeef9f",
+      "name": "When chat message received",
+      "webhookId": "8ee0d16d-0548-415f-bf94-82b70443b283"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a research-paper assistant. When the user asks about a topic that may be covered by the paper collection, call the “Search Papers” tool with the user’s full question before answering.\n\nUse the returned paper titles and abstracts as evidence, and use the returned graph categories when relevant. Summarize the most relevant findings clearly. Cite papers by title or ID. Do not invent facts or claim the collection supports more than the returned results show. If the tool finds no relevant papers or insufficient evidence, say so plainly."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "5c58c6d1-de3e-476d-a378-516ce150b2a8",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "qwen3:1.7b",
+        "options": {
+          "think": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        240,
+        240
+      ],
+      "id": "7d111b71-cb9a-45d0-9b03-ab8590a48835",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "JLO81E8hOUgM8dUs",
+          "name": "Ollama account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Search the research-paper collection for papers relevant to the user’s question. This tool embeds the question, finds similar papers in Neo4j, and retrieves each paper’s category from its graph relationships. Input: the user’s full question. Returns paper IDs, titles, abstracts, categories, and similarity scores. Use it for questions about topics covered by the paper collection. Base answers on the returned results and don’t invent details.\n\n",
+        "workflowId": {
+          "__rl": true,
+          "value": "mgDZqd3W1ijmcIhd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/mgDZqd3W1ijmcIhd",
+          "cachedResultName": "Papers search tool"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "quesiton"
+          ],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        208
+      ],
+      "id": "8f882791-3489-4ea1-a006-18dc3f3fe00c",
+      "name": "Call 'Papers search tool'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Papers search tool'": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "57ceb2cf-71fe-43b1-840d-934839f508a3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9b0ab1d1fb2c1acb98d66791206b6d928274b1e5728774f3881f48470e07785a"
+  },
+  "nodeGroups": [],
+  "id": "p5MfwpetAh6ACWAk",
+  "tags": []
+}

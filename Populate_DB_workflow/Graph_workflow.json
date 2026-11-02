@@ -1,0 +1,180 @@
+{
+  "name": "Articles to Neo4j Graph Database",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        352
+      ],
+      "id": "03168793-bc10-43c3-b9b6-d9a1637d3609",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/project_files/academic_papers.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2848,
+        352
+      ],
+      "id": "eb69446d-acf1-4745-9235-0979ecd4b912",
+      "name": "Read academic papers",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {
+          "headerRow": true
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        3072,
+        352
+      ],
+      "id": "5c47393f-42fc-4ce1-876d-510b22975585",
+      "name": "extract papers"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => {\n  const fields = Object.fromEntries(Object.entries(item.json).map(([key, value]) => [key.toLowerCase().replace(/[^a-z0-9]/g, ''), value]));\n  const rawId = fields.id ?? fields.paperid ?? fields.arxivid ?? fields.doi;\n  const id = String(rawId ?? '').trim();\n  if (!id) throw new Error(`Missing paper ID in CSV row ${index + 1}; check the CSV ID column header.`);\n\n  const rawTitle = fields.title ?? '';\n  const rawAbstract = fields.abstract ?? '';\n  const rawCategory = fields.primarycategory ?? fields.category ?? '';\n  return {\n    json: {\n      id,\n      title: String(rawTitle).trim(),\n                          abstract: String(rawAbstract).replace(/[\\r\\n]+/g, ' ').trim(),\n      category: String(rawCategory).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        352
+      ],
+      "id": "95dc4b7f-5704-46e9-a3a4-3516b6bb38e1",
+      "name": "Map values and trim"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3520,
+        352
+      ],
+      "id": "cb8eafb5-cf09-4bc5-a4e7-9a37af797f8e",
+      "name": "Loop"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:7474/db/vector/tx/commit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { statements: [{ statement: \"MERGE (a:Paper {id: $id}) SET a.title = $title, a.abstract = $abstract WITH a, CASE WHEN $category IS NULL OR trim($category) = '' THEN null ELSE trim($category) END AS categoryName FOREACH (_ IN CASE WHEN categoryName IS NULL THEN [] ELSE [1] END | MERGE (c:Category {name: categoryName}) MERGE (a)-[:IN_CATEGORY]->(c)) RETURN a.id AS saved_id\", parameters: { id: $json.id, title: $json.title, abstract: $json.abstract, category: $json.category } }] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3744,
+        352
+      ],
+      "id": "2216aa85-70e3-4cad-a204-ca42ede93bd1",
+      "name": "Store Articles in vector DB",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "wrca3CKqRRa391r9",
+          "name": "Unnamed credential"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read academic papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read academic papers": {
+      "main": [
+        [
+          {
+            "node": "extract papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract papers": {
+      "main": [
+        [
+          {
+            "node": "Map values and trim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map values and trim": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Store Articles in vector DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Articles in vector DB": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "72cb3383-1abe-4a1a-aff1-faaa5cefa82f",
+  "meta": {
+    "instanceId": "9b0ab1d1fb2c1acb98d66791206b6d928274b1e5728774f3881f48470e07785a"
+  },
+  "nodeGroups": [],
+  "id": "ScTCqWQZCeejInFm",
+  "tags": []
+}

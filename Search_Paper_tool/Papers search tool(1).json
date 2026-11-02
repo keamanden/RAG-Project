@@ -1,0 +1,161 @@
+{
+  "name": "Papers search tool",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:7474/db/vector/tx/commit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    statements: [\n      {\n        statement: \"CALL db.index.vector.queryNodes('paper_embeddings', 3, $embedding) YIELD node, score RETURN node.id AS id, node.title AS title, substring(node.abstract, 0, 500) AS abstract, score ORDER BY score DESC\",\n        parameters: {\n          embedding: $json.embedding\n        }\n      }\n    ]\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        544,
+        0
+      ],
+      "id": "9c95af25-23e7-47a6-995d-35438136d50f",
+      "name": "Vector Search",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "wrca3CKqRRa391r9",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:7474/db/vector/tx/commit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  statements: [\n    {\n      statement: \"MATCH (p:Paper)-[:IN_CATEGORY]->(c:Category) WHERE p.id IN $ids RETURN p.id AS id, p.title AS title, c.name AS category\",\n      parameters: {\n        ids: $input.first().json.results[0].data.map(result => result.row[0])\n      }\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        0
+      ],
+      "id": "acb8c57a-9c8a-4f03-a58f-9e710790fba2",
+      "name": "Graph Lookup",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "wrca3CKqRRa391r9",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"chatInput\": \"example\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        0
+      ],
+      "id": "b63e2bf3-88e4-44cf-ba22-0b6ef499f1e4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const vectorRows =\n  $('Vector Search').first().json.results?.[0]?.data ?? [];\n\nconst graphRows =\n  $('Graph Lookup').first().json.results?.[0]?.data ?? [];\n\nconst categories = new Map(\n  graphRows.map(({ row }) => [row[0], row[2]])\n);\n\nreturn [\n  {\n    json: {\n      papers: vectorRows.map(({ row }) => ({\n        id: row[0],\n        title: row[1],\n        abstract: row[2],\n        score: row[3],\n        category: categories.get(row[0]) ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        0
+      ],
+      "id": "fa4ed82d-49bb-4ac9-a449-683fdd4a5b9a",
+      "name": "Map results"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nomic-embed-text\",\n  \"prompt\": \"={{ $json.chatInput }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        0
+      ],
+      "id": "7e0e02a0-443b-432a-9fa1-4e7d5b80f2fe",
+      "name": "Embedding request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Vector Search": {
+      "main": [
+        [
+          {
+            "node": "Graph Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Embedding request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Graph Lookup": {
+      "main": [
+        [
+          {
+            "node": "Map results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding request": {
+      "main": [
+        [
+          {
+            "node": "Vector Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "73c91d39-3bf1-48f3-bec9-1efeba17e62e",
+  "meta": {
+    "instanceId": "9b0ab1d1fb2c1acb98d66791206b6d928274b1e5728774f3881f48470e07785a"
+  },
+  "nodeGroups": [],
+  "id": "mgDZqd3W1ijmcIhd",
+  "tags": []
+}
